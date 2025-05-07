@@ -1,0 +1,81 @@
+{
+    "_create_readonly": [
+        "id",
+        "created_on",
+        "updated_on",
+        "author",
+        "user",
+        "project",
+        "issue",
+        "spent_hours",
+        "relations",
+        "time_entries",
+        "children",
+        "attachments",
+        "relations",
+        "changesets",
+        "journals",
+        "watchers",
+        "allowed_statuses"
+    ],
+    "_update_readonly": [
+        "id",
+        "created_on",
+        "updated_on",
+        "author",
+        "user",
+        "project",
+        "issue",
+        "spent_hours",
+        "relations",
+        "time_entries",
+        "children",
+        "attachments",
+        "relations",
+        "changesets",
+        "journals",
+        "watchers",
+        "allowed_statuses"
+    ],
+    "_decoded_attrs": {
+        "relations": null,
+        "time_entries": null,
+        "id": 121134,
+        "project": {
+            "id": 94,
+            "name": "Cadastro-Instrumentos"
+        },
+        "tracker": {
+            "id": 25,
+            "name": "Tipo de Acessório"
+        },
+        "status": {
+            "id": 22,
+            "name": "Ativa"
+        },
+        "priority": {
+            "id": 2,
+            "name": "Normal"
+        },
+        "author": {
+            "id": 119,
+            "name": "Victor Soares Campos Teichmann"
+        },
+        "subject": "Sonda Isotróprica de Campo Eletromagnético WPF8 - 100kHz-8GHz - Wavecontrol",
+        "description": null,
+        "start_date": null,
+        "due_date": null,
+        "done_ratio": 0,
+        "is_private": false,
+        "estimated_hours": null,
+        "created_on": "2024-01-03T13:44:30Z",
+        "updated_on": "2024-01-03T13:44:30Z",
+        "closed_on": null,
+        "allowed_statuses": null,
+        "attachments": null,
+        "changesets": null,
+        "children": null,
+        "journals": null,
+        "watchers": null
+    }
+}

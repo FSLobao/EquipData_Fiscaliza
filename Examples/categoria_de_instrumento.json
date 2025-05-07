@@ -1,0 +1,90 @@
+{
+    "manager": "<redminelib.managers.IssueManager object for Issue resource>",
+    "_create_readonly": [
+        "id",
+        "created_on",
+        "updated_on",
+        "author",
+        "user",
+        "project",
+        "issue",
+        "spent_hours",
+        "relations",
+        "time_entries",
+        "children",
+        "attachments",
+        "relations",
+        "changesets",
+        "journals",
+        "watchers",
+        "allowed_statuses"
+    ],
+    "_update_readonly": [
+        "id",
+        "created_on",
+        "updated_on",
+        "author",
+        "user",
+        "project",
+        "issue",
+        "spent_hours",
+        "relations",
+        "time_entries",
+        "children",
+        "attachments",
+        "relations",
+        "changesets",
+        "journals",
+        "watchers",
+        "allowed_statuses"
+    ],
+    "_decoded_attrs": {
+        "relations": null,
+        "time_entries": null,
+        "children": null,
+        "attachments": null,
+        "changesets": null,
+        "journals": null,
+        "watchers": null,
+        "allowed_statuses": null,
+        "id": 148118,
+        "project": {
+            "id": 94,
+            "name": "Cadastro-Instrumentos"
+        },
+        "tracker": {
+            "id": 45,
+            "name": "Categoria de instrumento"
+        },
+        "status": {
+            "id": 22,
+            "name": "Ativa"
+        },
+        "priority": {
+            "id": 2,
+            "name": "Normal"
+        },
+        "author": {
+            "id": 1501,
+            "name": "Bruno Everton dos Santos Viana"
+        },
+        "subject": "RF - Potência",
+        "description": null,
+        "start_date": null,
+        "due_date": null,
+        "done_ratio": 0,
+        "is_private": false,
+        "estimated_hours": null,
+        "created_on": "2024-05-29T15: 22: 04Z",
+        "updated_on": "2024-05-29T15: 22: 04Z",
+        "closed_on": null
+    },
+    "_encoded_attrs": {
+        "id": 148118,
+        "tracker": "<redminelib.resources.Tracker #45 'Categoria de instrumento'>",
+        "status": "<redminelib.resources.IssueStatus #22 'Ativa'>",
+        "subject": "RF - Potência"
+    },
+    "_changes": {},
+    "_relations_name": "issue"
+}

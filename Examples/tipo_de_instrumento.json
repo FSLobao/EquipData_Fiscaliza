@@ -1,0 +1,90 @@
+{
+    "_create_readonly": [
+        "id",
+        "created_on",
+        "updated_on",
+        "author",
+        "user",
+        "project",
+        "issue",
+        "spent_hours",
+        "relations",
+        "time_entries",
+        "children",
+        "attachments",
+        "relations",
+        "changesets",
+        "journals",
+        "watchers",
+        "allowed_statuses"
+    ],
+    "_update_readonly": [
+        "id",
+        "created_on",
+        "updated_on",
+        "author",
+        "user",
+        "project",
+        "issue",
+        "spent_hours",
+        "relations",
+        "time_entries",
+        "children",
+        "attachments",
+        "relations",
+        "changesets",
+        "journals",
+        "watchers",
+        "allowed_statuses"
+    ],
+    "_decoded_attrs": {
+        "relations": null,
+        "time_entries": null,
+        "children": null,
+        "attachments": null,
+        "changesets": null,
+        "journals": null,
+        "watchers": null,
+        "allowed_statuses": null,
+        "id": 157119,
+        "project": {
+            "id": 94,
+            "name": "Cadastro-Instrumentos"
+        },
+        "tracker": {
+            "id": 21,
+            "name": "Tipo de instrumento"
+        },
+        "status": {
+            "id": 22,
+            "name": "Ativa"
+        },
+        "priority": {
+            "id": 2,
+            "name": "Normal"
+        },
+        "author": {
+            "id": 784,
+            "name": "Elson José da Silva"
+        },
+        "subject": "Bloqueador DC",
+        "description": null,
+        "start_date": null,
+        "due_date": null,
+        "done_ratio": 0,
+        "is_private": false,
+        "estimated_hours": null,
+        "custom_fields": [
+            {
+                "id": 540,
+                "name": "Categoria do instrumento",
+                "value": "{'valor': 'RF - Amplificadores, Atenuadores e Filtros','texto': 'RF - Amplificadores, Atenuadores e Filtros'}"
+        }
+    ],
+    "created_on": "2025-01-06T11: 48: 11Z",
+    "updated_on": "2025-01-06T11: 48: 11Z",
+    "closed_on": null
+},
+"_changes": {},
+"_relations_name": "issue"
+}
