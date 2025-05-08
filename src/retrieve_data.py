@@ -32,7 +32,7 @@ APP_TITLE:str = " FIDEx Tool "
 """ Title to be shown in the splash screen. """
 LINE_STYLE:str = "~"
 """ Character to be used as horizontal line style on the UI. """
-LOG_LEVEL:logging = logging.DEBUG
+LOG_LEVEL:str = "DEBUG"
 """ Logging level to be used in the script. """
 TEST_MODE:bool = True
 """ Flag to enable test mode. Default is False. """
@@ -118,7 +118,7 @@ class uiTerminal:
             
         # Define a custom formatter for colored logging
         coloredlogs.install(
-            level='INFO',
+            level=LOG_LEVEL,
             fmt=' %(asctime)s | %(levelname)8s |  %(message)s',
             field_styles={'asctime': {'color': 'green'}},
             level_styles={
@@ -137,16 +137,16 @@ class uiTerminal:
         )
 
         # Set the logging level for specific modules (e.g., redminelib)
-        logging.getLogger().setLevel(LOG_LEVEL)
         logging.getLogger("redminelib").setLevel(LOG_LEVEL)
         
-        # Set up the logger
+        """
+        # Set additional strem for redminelib logging
         handler = logging.StreamHandler()
         
         logger = logging.getLogger()
         logger.addHandler(handler)
         logger.setLevel(logging.DEBUG)
-
+        """
     # ------------------------------------------------------------------------------------------
     def start_logging(self) -> None:
         """
