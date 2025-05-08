@@ -5,7 +5,7 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
-    "colorlog>=6.9.0",
+    "coloredlogs>=15.0.1",
     "pandas>=2.2.3",
     "python-redmine>=2.5.0",
 ]

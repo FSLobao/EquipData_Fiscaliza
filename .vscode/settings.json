@@ -3,12 +3,16 @@
         "acessório",
         "CADASTRO",
         "Categoria",
+        "Fiscaliza",
         "instrumento",
         "Instrumentos",
         "Marca",
         "modelo",
         "Monitoramento",
         "Redmine",
-        "Tipo"
+        "redminelib",
+        "Situação",
+        "Tipo",
+        "Título"
     ]
 }
