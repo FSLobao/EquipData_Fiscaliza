@@ -36,6 +36,8 @@ LOG_LEVEL:str = "DEBUG"
 """ Logging level to be used in the script. """
 TEST_MODE:bool = True
 """ Flag to enable test mode. Default is False. """
+TEST_LENGTH:int = 2
+""" Number of projects to be processed in test mode. Default is 2. """
 
 REDMINE_URL:str = "https://sistemas.anatel.gov.br/fiscaliza"
 """ URL of the Redmine server. Default is "https://sistemas.anatel.gov.br/fiscaliza". """
@@ -139,14 +141,6 @@ class uiTerminal:
         # Set the logging level for specific modules (e.g., redminelib)
         logging.getLogger("redminelib").setLevel(LOG_LEVEL)
         
-        """
-        # Set additional strem for redminelib logging
-        handler = logging.StreamHandler()
-        
-        logger = logging.getLogger()
-        logger.addHandler(handler)
-        logger.setLevel(logging.DEBUG)
-        """
     # ------------------------------------------------------------------------------------------
     def start_logging(self) -> None:
         """
@@ -235,7 +229,7 @@ class RedmineParser:
         :param tracker_id: Tracker ID to filter issues by (optional).
         :return: Updated project dictionary adding a list of issues, under the key 'issues'.
         """
-        global TEST_MODE
+        global TEST_MODE, TEST_LENGTH
         
         test_mode_counter = 0
         
@@ -255,10 +249,9 @@ class RedmineParser:
         
             if TEST_MODE:
                 test_mode_counter += 1
-                if test_mode_counter==2:
-                    logging.info("Test mode active. Skipping issue data retrieval.")
-                    return
-
+                if test_mode_counter == TEST_LENGTH:
+                    logging.info("Test mode active. Skipping issue data retrieval of the remaining projects.")
+                    return project
             
         return project
 
@@ -327,7 +320,7 @@ class RedmineParser:
         Processes the equipment data by fetching issues from the projects with the associated equipment tracker and appending them to the DataFrame.
         """
         
-        global TEST_MODE, PRJ_INSTR_GENERAL_REGISTER, EQUIPMENT_TRACKER_ID
+        global TEST_MODE, TEST_LENGTH, PRJ_INSTR_GENERAL_REGISTER, EQUIPMENT_TRACKER_ID
         
         test_mode_counter = 0
         try:
@@ -345,7 +338,7 @@ class RedmineParser:
                     
                 if TEST_MODE:
                     test_mode_counter += 1
-                    if test_mode_counter==2:
+                    if test_mode_counter == TEST_LENGTH:
                         logging.info("Test mode active. Skipping data processing.")
                         return
         
