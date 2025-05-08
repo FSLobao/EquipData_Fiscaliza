@@ -1,10 +1,7 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
 """
-Created on Thu Oct 26 10:00:00 2023
-@project: Redmine Project Management
-@file: retrieve_data.py
-@description: This script connects to a Redmine server and retrieves a list of existing projects.
+@description: This is an ETL script to extract data from Redmine, transform it into a structured format, and load it into an Excel file.
 @license: MIT License
 @version: 1.0
 @maintainer: Fábio Santos Lobão
@@ -178,6 +175,8 @@ class RedmineParser:
         """ Output dictionary of DataFrames for various parsed general register tables (associated with different trackers). """
         self.instr_df: pd.DataFrame = pd.DataFrame()
         """ Output dataFrame for parsed equipment data entries (issues with equipment_TRACKER_ID). """
+        self.custom_fields_codes: dict = {}
+        """ Dictionary to store custom fields for the issues. """
     
     # ------------------------------------------------------------------------------------------
     def fetch_projects(self) -> dict:
@@ -236,7 +235,7 @@ class RedmineParser:
         for project_name, project_id in project.items():
             if project_id:
                 logging.info(f"Fetching issues for project: '{project_name}' (ID {project_id})...")
-                issues = self.redmine.issue.filter(project_id=project_id, status_id='*', tracker_id=tracker_id, limit=1500)
+                issues = self.redmine.issue.filter(project_id=project_id, status_id='*', tracker_id=tracker_id, include='journals', limit=1500)
                 logging.info(f"Found {len(issues)} issues in project: '{project_name}' (ID {project_id}).")
             
                 if len(issues) == 1500:
@@ -271,17 +270,58 @@ class RedmineParser:
             "Título (subject)": issue.subject
         }
         
+        # TODO: TEST CUSTOM FIELDS ID EXTRACTION
         try:
             for custom_field in issue.custom_fields:
                 if custom_field.value is not None:
                     if isinstance(custom_field.value, str) and custom_field.value.startswith('{'):
                         try:
                             custom_field_value = json.loads(custom_field.value)
-                            issue_data[custom_field.name] = custom_field_value.get('valor', 'N/A')
                         except json.JSONDecodeError:
-                            logging.error(f"Failed to decode JSON for custom field '{custom_field.name}'")
+                            custom_field_value = custom_field.value.replace('=>', ':')
+                            try:
+                                custom_field_value = json.loads(custom_field_value)
+                                custom_field_value["valor"] = custom_field_value.pop("numero")
+                            except json.JSONDecodeError:
+                                raise ValueError("Error after string replacement")
+                        except Exception as e:
+                            logging.error(f"Failed to decode custom field '{custom_field.name}': {e}")
+                            custom_field_value = {}
+                            
+                        issue_data_value = custom_field_value.get('valor', None)
+                        cf_id_key = str(custom_field_value.get('id', 0)) 
                     else:
-                        issue_data[custom_field.name] = custom_field.value
+                        issue_data_value = custom_field.value
+                        cf_id_key = str(custom_field.id)
+                    
+                    issue_data[custom_field.name] = issue_data_value
+                    self.custom_fields_codes[cf_id_key] = custom_field.name
+        
+            if issue.journals.total_count:
+                
+                calibration_date_found = False
+                calibration_number_found = False
+                
+                for journal in issue.journals:
+                    logging.debug(f"#{issue_data["id"]} details: {journal.details}")
+                    for detail in journal.details:
+                        match detail:
+                            case 'status_id':
+                                calibration_date = detail['old_value']
+                                calibration_year = detail['old_value'].split('-')[0]
+                                calibration_date = datetime.datetime.strptime(calibration_date, "%Y-%m-%d").date()
+                                key_cal_number = f"Nº SEI Certificado calibração {calibration_year}"
+                                key_cal_date = f"Data de calibração {calibration_year}"
+                                calibration_date_found = True
+                            case 'status_id':
+                                calibration_number = detail['old_value']
+                                calibration_number_found = True
+                        
+                        if calibration_date_found and calibration_number_found:
+                            issue_data[key_cal_number] = calibration_number
+                            issue_data[key_cal_date] = calibration_date
+                            break
+        
         except Exception as e:
             if type(e).__name__ != "ResourceAttrError":
                 logging.warning(f"Error processing issue: '{issue.tracker.name}' (ID {issue.id}): {e}")
@@ -296,6 +336,9 @@ class RedmineParser:
         
         global PRJ_INSTR_GENERAL_REGISTER
         
+        skipped_count = 0
+        processed_count = 0
+        
         try:
             # Fetch issues for the 'Cadastro-instrumentos' project
             self.gr_project_data = self.fetch_issues_by_project(self.gr_project_data)
@@ -308,9 +351,12 @@ class RedmineParser:
                     self.gr_df_dict[issue.tracker.name] = pd.concat([   self.gr_df_dict[issue.tracker.name],
                                                                         pd.DataFrame([issue_data])],
                                                                         ignore_index=True)
+                    processed_count += 1
                 except KeyError:
-                    logging.warning(f"Tracker '{issue.tracker.name}' not found in DataFrame dictionary. Skipping issue ID {issue.id}.")
-                                
+                    logging.debug(f"Tracker '{issue.tracker.name}' not found in DataFrame dictionary. Skipping issue ID {issue.id}.")
+                    skipped_count += 1
+                    
+            logging.info(f"Processed {processed_count} issues, skipped {skipped_count} from the general register.")
         except KeyError:
             return
 
