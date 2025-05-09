@@ -46,6 +46,10 @@ GR_ISSUE_TRACKER_NAMES:list = ["Categoria de instrumento", "Tipo de instrumento"
 """ List of issue tracker names for the general register. Default is ["Categoria de instrumento", "Tipo de instrumento", "Marca e Modelo", "Tipo de Acessório"]. """
 EQUIPMENT_TRACKER_ID:int = 20
 """ Tracker ID for equipment issues. Default is 20. """
+JOURNAL_CAL_DATE_ID:str = "581"
+""" ID of the journal field for calibration date. Default is 581. """
+JOURNAL_CAL_CERT_SEI_ID:str = "583"
+""" ID of the journal field for calibration certificate SEI number. Default is 583. """
 OUTPUT_FILENAME_SUFFIX:str = "instrumentos_anatel"
 """ Name of the output Excel file. Default is "redmine_data.xlsx". """
 OUTPUT_PATH:str = Path.home()
@@ -254,6 +258,69 @@ class RedmineParser:
             
         return project
 
+    def parse_calibration_historical_data(self, journals: object, issue_id: str) -> dict:
+        """
+        Parses journal data from an issue.
+
+        :param journal: The journal object to parse.
+        :param issue_data: The issue data dictionary to update with parsed values.
+    
+        :return: A dictionary containing the parsed journal data.
+        """
+        global JOURNAL_CAL_DATE_ID, JOURNAL_CAL_CERT_SEI_ID
+                
+        issue_data = {}        
+        for journal in journals:
+            logging.debug(f"#{issue_id} details: {journal.details}")
+            calibration_date_found = False
+            calibration_number_found = False
+
+            for detail in journal.details:
+                if detail['name'] == JOURNAL_CAL_DATE_ID:
+                    calibration_date = detail['old_value']
+                    calibration_date = datetime.datetime.strptime(calibration_date, "%Y-%m-%d").date()
+                    
+                    # Build keys for calibration number and date based on the year
+                    calibration_year = detail['old_value'].split('-')[0]
+                    cal_number_key = f"Nº SEI Certificado calibração {calibration_year}"
+                    cal_date_key = f"Data de calibração {calibration_year}"
+                    
+                    calibration_date_found = True
+                    
+                elif detail['name'] == JOURNAL_CAL_CERT_SEI_ID:
+                    calibration_number = detail['old_value']
+                    calibration_number_found = True
+                    
+                if calibration_date_found and calibration_number_found:
+                    issue_data[cal_number_key] = calibration_number
+                    issue_data[cal_date_key] = calibration_date
+                    break
+        
+        return issue_data
+
+    def parse_json_custom_field(self, custom_field: object) -> str:
+        """
+        Parses a custom field value that may contain JSON data.
+
+        :param custom_field: The custom field object to parse.
+        :return: Parsed value for the custom field.
+        """
+        try:
+            custom_field_json_value = json.loads(custom_field.value)
+        except json.JSONDecodeError:
+            # Handle special case of near JSON format from SEI API
+            custom_field_json_value = custom_field.value.replace('=>', ':')
+            try:
+                custom_field_json_value = json.loads(custom_field_json_value)
+                custom_field_json_value["valor"] = custom_field_json_value.pop("numero")
+            except json.JSONDecodeError:
+                raise ValueError("Error after string replacement")
+        except Exception as e:
+            logging.error(f"Failed to decode custom field '{custom_field.name}': {e}")
+            custom_field_json_value = {}
+
+        return custom_field_json_value.get('valor', "")
+    
     # ------------------------------------------------------------------------------------------
     def parse_issue_data(self, issue) -> dict:
         """
@@ -263,64 +330,37 @@ class RedmineParser:
         :return: A dictionary containing the parsed issue data.
         """
         
-        issue_data = {
-            "id": issue.id,
-            "Tipo (tracker)": issue.tracker.name,
-            "Situação (status)": issue.status.name,
-            "Título (subject)": issue.subject
-        }
-        
-        # TODO: TEST CUSTOM FIELDS ID EXTRACTION
         try:
+            # Parse mandatory fields from the issue
+            issue_data = {
+                "id": issue.id,
+                "Tipo (tracker)": issue.tracker.name,
+                "Situação (status)": issue.status.name,
+                "Título (subject)": issue.subject
+            }
+
+            # Parse custom fields
             for custom_field in issue.custom_fields:
-                if custom_field.value is not None:
-                    if isinstance(custom_field.value, str) and custom_field.value.startswith('{'):
-                        try:
-                            custom_field_value = json.loads(custom_field.value)
-                        except json.JSONDecodeError:
-                            custom_field_value = custom_field.value.replace('=>', ':')
-                            try:
-                                custom_field_value = json.loads(custom_field_value)
-                                custom_field_value["valor"] = custom_field_value.pop("numero")
-                            except json.JSONDecodeError:
-                                raise ValueError("Error after string replacement")
-                        except Exception as e:
-                            logging.error(f"Failed to decode custom field '{custom_field.name}': {e}")
-                            custom_field_value = {}
-                            
-                        issue_data_value = custom_field_value.get('valor', None)
-                        cf_id_key = str(custom_field_value.get('id', 0)) 
+                if isinstance(custom_field.value, list):
+                    parsed_values = []
+                    for item in custom_field.value:
+                        if str(item).startswith('{'):
+                            parsed_values.append(self.parse_json_custom_field(custom_field))
+                        else:
+                            parsed_values.append(item)
+                    parsed_custom_field_value = ', '.join(parsed_values)
+                else:
+                    if str(custom_field.value).startswith('{'):
+                        parsed_custom_field_value = self.parse_json_custom_field(custom_field)
                     else:
-                        issue_data_value = custom_field.value
-                        cf_id_key = str(custom_field.id)
+                        parsed_custom_field_value = custom_field.value
+                
+                issue_data[custom_field.name] = parsed_custom_field_value
+                self.custom_fields_codes[custom_field.id] = custom_field.name
                     
-                    issue_data[custom_field.name] = issue_data_value
-                    self.custom_fields_codes[cf_id_key] = custom_field.name
-        
+            # Parse historical calibration data from journals, if journals exist
             if issue.journals.total_count:
-                
-                calibration_date_found = False
-                calibration_number_found = False
-                
-                for journal in issue.journals:
-                    logging.debug(f"#{issue_data["id"]} details: {journal.details}")
-                    for detail in journal.details:
-                        match detail:
-                            case 'status_id':
-                                calibration_date = detail['old_value']
-                                calibration_year = detail['old_value'].split('-')[0]
-                                calibration_date = datetime.datetime.strptime(calibration_date, "%Y-%m-%d").date()
-                                key_cal_number = f"Nº SEI Certificado calibração {calibration_year}"
-                                key_cal_date = f"Data de calibração {calibration_year}"
-                                calibration_date_found = True
-                            case 'status_id':
-                                calibration_number = detail['old_value']
-                                calibration_number_found = True
-                        
-                        if calibration_date_found and calibration_number_found:
-                            issue_data[key_cal_number] = calibration_number
-                            issue_data[key_cal_date] = calibration_date
-                            break
+                issue_data.update(self.parse_calibration_historical_data(issue.journals, issue_data["id"]))
         
         except Exception as e:
             if type(e).__name__ != "ResourceAttrError":
