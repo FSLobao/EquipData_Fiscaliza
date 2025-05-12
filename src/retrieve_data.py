@@ -42,6 +42,8 @@ PRJ_INSTR_GENERAL_REGISTER:str = "Cadastro-Instrumentos"
 """ Name of the project for general register. Default is "Cadastro-Instrumentos". """
 PROJECT_NAME_KEYWORD:str = "Instrumentos"
 """ Keyword to filter projects. Default is "Instrumentos". """
+PRJ_TO_SKIP:list = [94, 123, 98, 99, 100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115, 116, 117, 118, 119, 120, 121, 122]
+""" List of project IDs to skip. Default is []. """
 GR_ISSUE_TRACKER_NAMES:list = ["Categoria de instrumento", "Tipo de instrumento", "Marca e Modelo", "Tipo de Acessório"]
 """ List of issue tracker names for the general register. Default is ["Categoria de instrumento", "Tipo de instrumento", "Marca e Modelo", "Tipo de Acessório"]. """
 EQUIPMENT_TRACKER_ID:int = 20
@@ -108,7 +110,30 @@ class uiTerminal:
         self.password = getpass.getpass("Password: ").strip()
         print(f"{self.line}\n\033[0m")
     
-    # ----------------------------------------------------------------------------------------------
+    # ------------------------------------------------------------------------------------------
+    def query_yes_no(self, question: str) -> bool:
+        """
+        Ask a yes/no question and return the answer.
+
+        :param question: The question to ask.
+        :return: True if the answer in ['yes','y','YES','Y'] or False if the answer in ['no','n','NO','N'], ignoring spaces. Keep asking until a valid answer is given.
+        """
+        
+        answer = None
+        print(f"\033[90m\n{self.line}")
+        while answer is None:
+            answer = input(f"{question} (y/n): ").strip().lower()
+            if answer in ['y', 'yes']:
+                answer = True
+            elif answer in ['n', 'no']:
+                answer = False
+            else:
+                print("Please respond with 'y' or 'n'.")
+                
+        print(f"{self.line}\n\033[0m")
+        return answer
+    
+    # ------------------------------------------------------------------------------------------
     def setup_logging(self) -> None:
         """
         Sets up the logging configuration for the script.
@@ -169,6 +194,8 @@ class RedmineParser:
         """
         global REDMINE_URL, GR_ISSUE_TRACKER_NAMES
         
+        self.ui: uiTerminal = ui
+        """ Instance of the uiTerminal class for user interaction. """
         self.redmine: Redmine = Redmine(REDMINE_URL, username=ui.username, password=ui.password)
         """ Redmine object connected to the server for data retrieval. """
         self.equipment_projects_data: dict = {}
@@ -188,14 +215,16 @@ class RedmineParser:
         Fetches projects from the Redmine server and filters them based on the keyword in their name.
         """
         
-        global PROJECT_NAME_KEYWORD, PRJ_INSTR_GENERAL_REGISTER, PROJECT_NAME_KEYWORD
+        global PROJECT_NAME_KEYWORD, PRJ_INSTR_GENERAL_REGISTER, PROJECT_NAME_KEYWORD, PRJ_TO_SKIP
         
         # Query for existing projects
         logging.info("Fetching projects...")
         projects = self.redmine.project.all()
         
         # Filter projects based on the keyword in their name
-        self.equipment_projects_data = {project.name: project.id for project in projects if PROJECT_NAME_KEYWORD in project.name}
+        self.equipment_projects_data = {project.name: project.id for project in projects if (PROJECT_NAME_KEYWORD in project.name and project.id not in PRJ_TO_SKIP)}
+        
+        logging.debug(f"Fetched projects: {json.dumps(self.equipment_projects_data, indent=4)}")
         
         # Set up the project dictionary for the general register from the equipment project IDs
         try:
@@ -209,9 +238,7 @@ class RedmineParser:
         if self.gr_project_data:
             logging.info("General register project id found'.")
         else:
-            logging.warning("General register project not found. Should skip it? (y/n)")
-            answer = input("Answer: ").strip().lower()
-            if answer == "y":
+            if self.ui.query_yes_no(f"Project '{PRJ_INSTR_GENERAL_REGISTER}' not found. Do you want to skip it?"):
                 logging.info("Skipping general register project.")
             else:
                 logging.error("General register project not found. Exiting.")
@@ -231,30 +258,40 @@ class RedmineParser:
         :param project: Name and ID of the project to fetch issues from.
         :param tracker_id: Tracker ID to filter issues by (optional).
         :return: Updated project dictionary adding a list of issues, under the key 'issues'.
+        :raise: Exception if an error occurs different from AttributeError.
         """
         global TEST_MODE, TEST_LENGTH
         
         test_mode_counter = 0
         
-        for project_name, project_id in project.items():
-            if project_id:
-                logging.info(f"Fetching issues for project: '{project_name}' (ID {project_id})...")
-                issues = self.redmine.issue.filter(project_id=project_id, status_id='*', tracker_id=tracker_id, include='journals', limit=1500)
-                logging.info(f"Found {len(issues)} issues in project: '{project_name}' (ID {project_id}).")
+        try:
+            for project_name, project_id in project.items():
+                if project_id:
+                    logging.info(f"Fetching issues for project: '{project_name}' (ID {project_id})...")
+                    issues = self.redmine.issue.filter(project_id=project_id, status_id='*', tracker_id=tracker_id, include='journals', limit=1500)
+                    logging.info(f"Found {len(issues)} issues in project: '{project_name}' (ID {project_id}).")
+                
+                    if len(issues) == 1500:
+                        logging.info("Warning: More than 1500 issues found. Consider paginating the results.")
+                
+                    project[project_name]={"id":project_id,"issues":issues}
+                else:
+                    logging.warning(f"Invalid project ID {project_id} provided.")
+                    project.pop(project_name,None)
             
-                if len(issues) == 1500:
-                    logging.info("Warning: More than 1500 issues found. Consider paginating the results.")
-            
-                project[project_name]={"id":project_id,"issues":issues}
-            else:
-                logging.warning(f"Invalid project ID {project_id} provided.")
-                project.pop(project_name,None)
-        
-            if TEST_MODE:
-                test_mode_counter += 1
-                if test_mode_counter == TEST_LENGTH:
-                    logging.info("Test mode active. Skipping issue data retrieval of the remaining projects.")
-                    return project
+                if TEST_MODE:
+                    test_mode_counter += 1
+                    if test_mode_counter == TEST_LENGTH:
+                        logging.info("Test mode active. Skipping issue data retrieval of the remaining projects.")
+                        return project
+        except AttributeError:
+            project = {"None": 0, "issues": []}
+        except Exception as e:
+            try:
+                logging.error(f"Error fetching issues for project '{project_name}' (ID {project_id}): {e}")
+            except Exception as e:
+                logging.error(f"Error due project item without name or id: {e}")
+            raise
             
         return project
 
@@ -358,6 +395,8 @@ class RedmineParser:
                 issue_data[custom_field.name] = parsed_custom_field_value
                 self.custom_fields_codes[custom_field.id] = custom_field.name
                     
+            logging.debug(f"Parsed custom fields data: {json.dumps(self.custom_fields_codes, indent=4)}")
+            
             # Parse historical calibration data from journals, if journals exist
             if issue.journals.total_count:
                 issue_data.update(self.parse_calibration_historical_data(issue.journals, issue_data["id"]))
