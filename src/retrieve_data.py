@@ -111,7 +111,23 @@ class uiTerminal:
         print(f"{self.line}\n\033[0m")
     
     # ------------------------------------------------------------------------------------------
-    def query_yes_no(self, question: str) -> bool:
+    def query_window(self, query_method: callable, *args, **kwargs) -> None:
+        """
+        Wraps a query method with horizontal lines printed before and after its execution.
+
+        :param query_method: The query method to be executed (e.g., query_yes_no or query_any_key).
+        :param args: Positional arguments to pass to the query method.
+        :param kwargs: Keyword arguments to pass to the query method.
+        :return: The result of the query method, if any.
+        """
+        print(f"\033[90m\n{self.line}")
+        result = query_method(*args, **kwargs)
+        print(f"{self.line}\n\033[0m")
+        return result
+        
+    
+    # ------------------------------------------------------------------------------------------
+    def yes_no(self, question: str) -> bool:
         """
         Ask a yes/no question and return the answer.
 
@@ -120,7 +136,6 @@ class uiTerminal:
         """
         
         answer = None
-        print(f"\033[90m\n{self.line}")
         while answer is None:
             answer = input(f"{question} (y/n): ").strip().lower()
             if answer in ['y', 'yes']:
@@ -129,9 +144,19 @@ class uiTerminal:
                 answer = False
             else:
                 print("Please respond with 'y' or 'n'.")
+                answer = None
                 
-        print(f"{self.line}\n\033[0m")
         return answer
+    
+    # ------------------------------------------------------------------------------------------
+    def any_key(self, question: str) -> None:
+        """
+        Ask a question and wait for any key to be pressed.
+
+        :param question: The question to ask.
+        """
+        
+        input(f"{question} (Press any key to continue...)")
     
     # ------------------------------------------------------------------------------------------
     def setup_logging(self) -> None:
@@ -172,10 +197,26 @@ class uiTerminal:
         """
         Print log header and start logging.
         """
+
+        global REDMINE_URL, PRJ_INSTR_GENERAL_REGISTER, PROJECT_NAME_KEYWORD, PRJ_TO_SKIP, GR_ISSUE_TRACKER_NAMES, EQUIPMENT_TRACKER_ID        
         
         print(f"\033[90m{self.line}\033[0m")
         print("\033[92mTIMESTAMP\033[0m            | LEVEL    | \033[94mMESSAGE\033[0m")
         self.setup_logging()
+
+        logging.debug("Configured parameters:")
+        logging.debug(f"Test Mode: {TEST_MODE}")
+        logging.debug(f"Test Length: {TEST_LENGTH}")
+        logging.debug(f"Redmine URL: {REDMINE_URL}")
+        logging.debug(f"General Register Project: {PRJ_INSTR_GENERAL_REGISTER}")
+        logging.debug(f"Project Name Keyword: {PROJECT_NAME_KEYWORD}")
+        logging.debug(f"Projects to Skip: {PRJ_TO_SKIP}")
+        logging.debug(f"General Register Issue Tracker Names: {GR_ISSUE_TRACKER_NAMES}")
+        logging.debug(f"Equipment Tracker ID: {EQUIPMENT_TRACKER_ID}")
+        logging.debug(f"Journal Calibration Date ID: {JOURNAL_CAL_DATE_ID}")
+        logging.debug(f"Journal Calibration Certificate SEI ID: {JOURNAL_CAL_CERT_SEI_ID}")
+        logging.debug(f"Output Filename Suffix: {OUTPUT_FILENAME_SUFFIX}")
+        logging.debug(f"Output Path: {OUTPUT_PATH}")        
 
 # ----------------------------------------------------------------------------------------------
 class RedmineParser:
@@ -231,14 +272,13 @@ class RedmineParser:
             self.gr_project_data = {PRJ_INSTR_GENERAL_REGISTER: self.equipment_projects_data[PRJ_INSTR_GENERAL_REGISTER]}
             self.equipment_projects_data.pop(PRJ_INSTR_GENERAL_REGISTER, None)
         except KeyError:
-            logging.error(f"Project '{PRJ_INSTR_GENERAL_REGISTER}' not found in the fetched projects.")
             self.gr_project_data = None
         
         # Check projects found
         if self.gr_project_data:
             logging.info("General register project id found'.")
         else:
-            if self.ui.query_yes_no(f"Project '{PRJ_INSTR_GENERAL_REGISTER}' not found. Do you want to skip it?"):
+            if self.ui.query_window(self.ui.yes_no, "General register project not found. Do you want to skip it?"):
                 logging.info("Skipping general register project.")
             else:
                 logging.error("General register project not found. Exiting.")
@@ -344,6 +384,10 @@ class RedmineParser:
                     issue_data[cal_number_key] = calibration_number
                     issue_data[cal_date_key] = calibration_date
                     break
+            
+            # handle special case where only the calibration number is found
+            if calibration_number_found and not calibration_date_found:
+                issue_data["Nº SEI Certificado calibração ANO NÃO CADASTRADO"] = calibration_number
         
         return issue_data
 
@@ -407,8 +451,6 @@ class RedmineParser:
                 
                 issue_data[custom_field.name] = parsed_custom_field_value
                 self.custom_fields_codes[custom_field.id] = custom_field.name
-                    
-            logging.debug(f"Parsed custom fields data: {json.dumps(self.custom_fields_codes, indent=4)}")
             
             # Parse historical calibration data from journals, if journals exist
             if issue.journals.total_count:
@@ -475,6 +517,8 @@ class RedmineParser:
                     issue_data = self.parse_issue_data(issue)
                     self.instr_df = pd.concat([self.instr_df, pd.DataFrame([issue_data])], ignore_index=True)
                     
+                logging.debug(f"Custom codes in Project '{project_name}' (ID {project['id']}): {json.dumps(self.custom_fields_codes, indent=4)}")
+                    
                 if TEST_MODE:
                     test_mode_counter += 1
                     if test_mode_counter == TEST_LENGTH:
@@ -505,11 +549,22 @@ class RedmineParser:
                 if not df.empty:
                     df.to_excel(writer, sheet_name=tracker_name, index=False)
             
+            df_projects = pd.DataFrame.from_dict(self.equipment_projects_data, orient='index', columns=['Project ID'])
+            df_projects.index.name = 'Project Name'
+            df_projects.to_excel(writer, sheet_name="Projects", index=True)
+            
+            df_cfc = pd.DataFrame.from_dict(self.custom_fields_codes, orient='index', columns=['Custom Field Name'])
+            df_cfc.index.name = 'Custom Field ID'
+            df_cfc.to_excel(writer, sheet_name="Custom Field Codes", index=True)
+            
             # Save the equipment DataFrame
             self.instr_df.to_excel(writer, sheet_name=PROJECT_NAME_KEYWORD, index=False)
+            
+
         
         return filename
     
+# ----------------------------------------------------------------------------------------------    
 def main():
     
     try:
@@ -524,7 +579,9 @@ def main():
         filename = rp.save_data_to_file()
         
         logging.info(f"Data saved to {filename}")
-        logging.info("Process completed successfully.") 
+        logging.info("Process completed successfully.")
+        ui.query_window(ui.any_key, "Press any key to exit.")
+        exit(0)
         
     except Exception as e:
         logging.error(f"Unhandled error occurred: {e}")
