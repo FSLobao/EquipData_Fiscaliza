@@ -347,51 +347,7 @@ class RedmineParser:
             
         return project
 
-    def parse_calibration_historical_data(self, journals: object, issue_id: str) -> dict:
-        """
-        Parses journal data from an issue.
-
-        :param journal: The journal object to parse.
-        :param issue_data: The issue data dictionary to update with parsed values.
-    
-        :return: A dictionary containing the parsed journal data.
-        """
-        global JOURNAL_CAL_DATE_ID, JOURNAL_CAL_CERT_SEI_ID
-                
-        issue_data = {}        
-        for journal in journals:
-            logging.debug(f"#{issue_id} details: {journal.details}")
-            calibration_date_found = False
-            calibration_number_found = False
-
-            for detail in journal.details:
-                if detail['name'] == JOURNAL_CAL_DATE_ID:
-                    calibration_date = detail['old_value']
-                    if not calibration_date:
-                        continue
-                    else:
-                        # Build keys for calibration number and date based on the year
-                        calibration_year = detail['old_value'].split('-')[0]
-                        cal_number_key = f"Nº SEI Certificado calibração {calibration_year}"
-                        cal_date_key = f"Data de calibração {calibration_year}"
-                        
-                        calibration_date_found = True
-                    
-                elif detail['name'] == JOURNAL_CAL_CERT_SEI_ID:
-                    calibration_number = detail['old_value']
-                    calibration_number_found = True
-                    
-                if calibration_date_found and calibration_number_found:
-                    issue_data[cal_number_key] = calibration_number
-                    issue_data[cal_date_key] = calibration_date
-                    break
-            
-            # handle special case where only the calibration number is found
-            if calibration_number_found and not calibration_date_found:
-                issue_data["Nº SEI Certificado calibração ANO NÃO CADASTRADO"] = calibration_number
-        
-        return issue_data
-
+    # ------------------------------------------------------------------------------------------
     def parse_json_custom_field(self, custom_field_value: str) -> str:
         """
         Parses a custom field value that may contain JSON data.
@@ -415,6 +371,52 @@ class RedmineParser:
             custom_field_json_value = {}
 
         return custom_field_json_value.get('valor', "")
+
+    # ------------------------------------------------------------------------------------------
+    def parse_calibration_historical_data(self, journals: object, issue_id: str) -> dict:
+        """
+        Parses journal data from an issue.
+
+        :param journal: The journal object to parse.
+        :param issue_data: The issue data dictionary to update with parsed values.
+    
+        :return: A dictionary containing the parsed journal data.
+        """
+        global JOURNAL_CAL_DATE_ID, JOURNAL_CAL_CERT_SEI_ID
+                
+        issue_data = {}        
+        for journal in journals:
+            logging.debug(f"#{issue_id} details: {journal.details}")
+            calibration_date_found = False
+            calibration_number_found = False
+
+            for detail in journal.details:
+                if detail['name'] == JOURNAL_CAL_DATE_ID:
+                    # Perform a check to ensure the year is valid and get the calibration year
+                    calibration_year = detail['old_value'].split('-')[0]
+                    if len(calibration_year) != 4:
+                        continue
+                    else:
+                        # Build keys for calibration number and date based on the year
+                        calibration_date = detail['old_value']
+                        cal_number_key = f"Nº SEI Certificado calibração {calibration_year}"
+                        cal_date_key = f"Data de calibração {calibration_year}"
+                        calibration_date_found = True
+                    
+                elif detail['name'] == JOURNAL_CAL_CERT_SEI_ID:
+                    calibration_number = self.parse_json_custom_field(detail['old_value'])
+                    calibration_number_found = True
+                    
+                if calibration_date_found and calibration_number_found:
+                    issue_data[cal_number_key] = calibration_number
+                    issue_data[cal_date_key] = calibration_date
+                    break
+            
+            # handle special case where only the calibration number is found
+            if calibration_number_found and not calibration_date_found:
+                issue_data["Nº SEI Certificado calibração ANO NÃO CADASTRADO"] = calibration_number
+        
+        return issue_data
     
     # ------------------------------------------------------------------------------------------
     def parse_issue_data(self, issue) -> dict:
