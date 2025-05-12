@@ -31,7 +31,7 @@ LINE_STYLE:str = "~"
 """ Character to be used as horizontal line style on the UI. """
 LOG_LEVEL:str = "DEBUG"
 """ Logging level to be used in the script. """
-TEST_MODE:bool = True
+TEST_MODE:bool = False
 """ Flag to enable test mode. Default is False. """
 TEST_LENGTH:int = 2
 """ Number of projects to be processed in test mode. Default is 2. """
@@ -251,7 +251,7 @@ class RedmineParser:
             exit(1)
     
     # ------------------------------------------------------------------------------------------
-    def fetch_issues_by_project(self, project: dict, tracker_id:str = None) -> dict:
+    def fetch_issues_by_project(self, project: dict, tracker_id:str = None, include_journals:bool = True) -> dict:
         """
         Fetches issues for a given project ID from the Redmine server.
 
@@ -268,7 +268,18 @@ class RedmineParser:
             for project_name, project_id in project.items():
                 if project_id:
                     logging.info(f"Fetching issues for project: '{project_name}' (ID {project_id})...")
-                    issues = self.redmine.issue.filter(project_id=project_id, status_id='*', tracker_id=tracker_id, include='journals', limit=1500)
+                    
+                    issue_filter_params = {
+                        "project_id": project_id,
+                        "status_id": "*",
+                        "limit": 1500
+                    }
+                    if tracker_id:
+                        issue_filter_params["tracker_id"] = tracker_id
+                    if include_journals:
+                        issue_filter_params["include"] = "journals"
+                        
+                    issues = self.redmine.issue.filter(**issue_filter_params)
                     logging.info(f"Found {len(issues)} issues in project: '{project_name}' (ID {project_id}).")
                 
                     if len(issues) == 1500:
@@ -315,14 +326,15 @@ class RedmineParser:
             for detail in journal.details:
                 if detail['name'] == JOURNAL_CAL_DATE_ID:
                     calibration_date = detail['old_value']
-                    calibration_date = datetime.datetime.strptime(calibration_date, "%Y-%m-%d").date()
-                    
-                    # Build keys for calibration number and date based on the year
-                    calibration_year = detail['old_value'].split('-')[0]
-                    cal_number_key = f"Nº SEI Certificado calibração {calibration_year}"
-                    cal_date_key = f"Data de calibração {calibration_year}"
-                    
-                    calibration_date_found = True
+                    if not calibration_date:
+                        continue
+                    else:
+                        # Build keys for calibration number and date based on the year
+                        calibration_year = detail['old_value'].split('-')[0]
+                        cal_number_key = f"Nº SEI Certificado calibração {calibration_year}"
+                        cal_date_key = f"Data de calibração {calibration_year}"
+                        
+                        calibration_date_found = True
                     
                 elif detail['name'] == JOURNAL_CAL_CERT_SEI_ID:
                     calibration_number = detail['old_value']
@@ -335,7 +347,7 @@ class RedmineParser:
         
         return issue_data
 
-    def parse_json_custom_field(self, custom_field: object) -> str:
+    def parse_json_custom_field(self, custom_field_value: str) -> str:
         """
         Parses a custom field value that may contain JSON data.
 
@@ -343,17 +355,18 @@ class RedmineParser:
         :return: Parsed value for the custom field.
         """
         try:
-            custom_field_json_value = json.loads(custom_field.value)
+            custom_field_json_value = json.loads(custom_field_value)
         except json.JSONDecodeError:
-            # Handle special case of near JSON format from SEI API
-            custom_field_json_value = custom_field.value.replace('=>', ':')
+            # Handle special case of near JSON format
+            custom_field_value = custom_field_value.replace('=>', ':')
+            custom_field_value = custom_field_value.replace('"numero"', '"valor"')
+            custom_field_value = custom_field_value.replace('19"LED', '19\\"LED')
             try:
-                custom_field_json_value = json.loads(custom_field_json_value)
-                custom_field_json_value["valor"] = custom_field_json_value.pop("numero")
+                custom_field_json_value = json.loads(custom_field_value)
             except json.JSONDecodeError:
-                raise ValueError("Error after string replacement")
+                raise ValueError(f"Error after string replacement for custom field value: {custom_field_value}")
         except Exception as e:
-            logging.error(f"Failed to decode custom field '{custom_field.name}': {e}")
+            logging.error(f"Failed to decode custom field '{custom_field_value}': {e}")
             custom_field_json_value = {}
 
         return custom_field_json_value.get('valor', "")
@@ -382,13 +395,13 @@ class RedmineParser:
                     parsed_values = []
                     for item in custom_field.value:
                         if str(item).startswith('{'):
-                            parsed_values.append(self.parse_json_custom_field(custom_field))
+                            parsed_values.append(self.parse_json_custom_field(item))
                         else:
                             parsed_values.append(item)
                     parsed_custom_field_value = ', '.join(parsed_values)
                 else:
                     if str(custom_field.value).startswith('{'):
-                        parsed_custom_field_value = self.parse_json_custom_field(custom_field)
+                        parsed_custom_field_value = self.parse_json_custom_field(custom_field.value)
                     else:
                         parsed_custom_field_value = custom_field.value
                 
@@ -400,8 +413,9 @@ class RedmineParser:
             # Parse historical calibration data from journals, if journals exist
             if issue.journals.total_count:
                 issue_data.update(self.parse_calibration_historical_data(issue.journals, issue_data["id"]))
-        
+                
         except Exception as e:
+            # If missing attributes in RedMine data, skip the issue
             if type(e).__name__ != "ResourceAttrError":
                 logging.warning(f"Error processing issue: '{issue.tracker.name}' (ID {issue.id}): {e}")
 
@@ -420,7 +434,7 @@ class RedmineParser:
         
         try:
             # Fetch issues for the 'Cadastro-instrumentos' project
-            self.gr_project_data = self.fetch_issues_by_project(self.gr_project_data)
+            self.gr_project_data = self.fetch_issues_by_project(self.gr_project_data, include_journals=False)
         
             # Process each issue and store it in the appropriate DataFrame
             for issue in self.gr_project_data[PRJ_INSTR_GENERAL_REGISTER]["issues"]:
