@@ -1,3 +1,3 @@
 # EquipData_Fiscaliza
 
-This is a small repo with python notebooks dedicated to automate data extraction from redmine into pandas dataframes, including recovery of historycal data from journal entries.
+This is a small repo with Python script for data extraction (ETL) from Redmine into pandas Dataframes and then to XLSX file with multiple sheets. Includes recovery of historical data from journal entries.
