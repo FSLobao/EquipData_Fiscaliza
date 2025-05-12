@@ -35,6 +35,9 @@ TEST_MODE:bool = False
 """ Flag to enable test mode. Default is False. """
 TEST_LENGTH:int = 2
 """ Number of projects to be processed in test mode. Default is 2. """
+PRJ_TO_SKIP:list = []
+""" List of project IDs to skip. Default is []. """
+# PRJ_TO_SKIP:list = [94, 123, 98, 99, 100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115, 116, 117, 118, 119, 120, 121, 122]
 
 REDMINE_URL:str = "https://sistemas.anatel.gov.br/fiscaliza"
 """ URL of the Redmine server. Default is "https://sistemas.anatel.gov.br/fiscaliza". """
@@ -42,8 +45,6 @@ PRJ_INSTR_GENERAL_REGISTER:str = "Cadastro-Instrumentos"
 """ Name of the project for general register. Default is "Cadastro-Instrumentos". """
 PROJECT_NAME_KEYWORD:str = "Instrumentos"
 """ Keyword to filter projects. Default is "Instrumentos". """
-PRJ_TO_SKIP:list = [94, 123, 98, 99, 100, 101, 102, 103, 104, 105, 106, 107, 108, 109, 110, 111, 112, 113, 114, 115, 116, 117, 118, 119, 120, 121, 122]
-""" List of project IDs to skip. Default is []. """
 GR_ISSUE_TRACKER_NAMES:list = ["Categoria de instrumento", "Tipo de instrumento", "Marca e Modelo", "Tipo de Acessório"]
 """ List of issue tracker names for the general register. Default is ["Categoria de instrumento", "Tipo de instrumento", "Marca e Modelo", "Tipo de Acessório"]. """
 EQUIPMENT_TRACKER_ID:int = 20
