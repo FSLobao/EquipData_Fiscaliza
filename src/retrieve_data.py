@@ -21,6 +21,7 @@ import getpass
 import json
 
 import pandas as pd
+import keyboard
 
 # ----------------------------------------------------------------------------------------------
 # Constants and configuration variables
@@ -157,7 +158,11 @@ class uiTerminal:
         :param question: The question to ask.
         """
         
-        input(f"{question} (Press any key to continue...)")
+        print(f"{question} (Press any key to continue...)")
+        while True:
+            event = keyboard.read_event()
+            if event.event_type == keyboard.KEY_DOWN:
+                break
     
     # ------------------------------------------------------------------------------------------
     def setup_logging(self) -> None:
@@ -365,12 +370,15 @@ class RedmineParser:
             try:
                 custom_field_json_value = json.loads(custom_field_value)
             except json.JSONDecodeError:
-                raise ValueError(f"Error after string replacement for custom field value: {custom_field_value}")
+                raise ValueError(f"JSONDecodeError after string replacement for custom field value: {custom_field_value}")
+        except TypeError as e:
+            custom_field_json_value = {}
+            logging.debug(f"TypeError in parse_json_custom_field: {e}. Custom field value is not a string: {custom_field_value}")
         except Exception as e:
             logging.error(f"Failed to decode custom field '{custom_field_value}': {e}")
             custom_field_json_value = {}
 
-        return custom_field_json_value.get('valor', "")
+        return custom_field_json_value.get("valor", "")
 
     # ------------------------------------------------------------------------------------------
     def parse_calibration_historical_data(self, journals: object, issue_id: str) -> dict:
@@ -405,7 +413,11 @@ class RedmineParser:
                     
                 elif detail['name'] == JOURNAL_CAL_CERT_SEI_ID:
                     calibration_number = self.parse_json_custom_field(detail['old_value'])
-                    calibration_number_found = True
+                    
+                    if calibration_number == "":
+                        continue
+                    else:
+                        calibration_number_found = True
                     
                 if calibration_date_found and calibration_number_found:
                     issue_data[cal_number_key] = calibration_number
@@ -583,7 +595,7 @@ def main():
         
         logging.info(f"Data saved to {filename}")
         logging.info("Process completed successfully.")
-        ui.query_window(ui.any_key, "Press any key to exit.")
+        ui.query_window(ui.any_key, "The End.")
         exit(0)
         
     except Exception as e:
