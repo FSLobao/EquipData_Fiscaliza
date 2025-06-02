@@ -1,5 +1,7 @@
 <a name="indexerd-md-top"></a>
 
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/FSLobao/EquipData_Fiscaliza)
+
 <!-- TABLE OF CONTENTS -->
 
 <details>
